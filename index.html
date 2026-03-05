@@ -1,0 +1,105 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toyota - Inventario</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <h1>TOYOTA</h1>
+                <span>Inventario</span>
+            </div>
+
+            <div class="header-controls">
+                <div class="turno-selector">
+                    <label>Turno:</label>
+                    <div class="turno-buttons">
+                        <button class="turno-btn" data-turno="1">1o</button>
+                        <button class="turno-btn" data-turno="2">2o</button>
+                        <button class="turno-btn" data-turno="3">3o</button>
+                    </div>
+                </div>
+
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema">
+                    <span class="theme-toggle-indicator" aria-hidden="true"></span>
+                    <span class="theme-toggle-text" id="themeToggleText">Modo escuro</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div id="telaInicial" class="tela ativa">
+                <div class="search-box">
+                    <input type="text" id="buscaPN" placeholder="Buscar part number... (digite para filtrar)">
+                </div>
+
+                <div class="modelos-grid" id="modelosContainer">
+                    <!-- Modelos serao inseridos via JS -->
+                </div>
+            </div>
+
+            <div id="telaPreenchimento" class="tela">
+                <div class="preenchimento-header">
+                    <button class="btn-voltar" id="btnVoltar">Voltar</button>
+                    <h2 id="tituloModelo"></h2>
+                    <span class="turno-info" id="turnoInfo"></span>
+                </div>
+
+                <div class="cards-container" id="cardsContainer">
+                    <!-- Cards serao inseridos via JS -->
+                </div>
+
+                <div class="footer-envio">
+                    <button class="btn-enviar" id="btnEnviar">
+                        <span class="btn-enviar-icon" aria-hidden="true">-></span>
+                        ENVIAR INVENTARIO
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <div id="notificacao" class="notificacao"></div>
+    </div>
+
+    <div id="modalConfirmacao" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-icon">!</span>
+                <h3>Atencao</h3>
+            </div>
+            <div class="modal-body">
+                <p id="modalMensagem"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancelar" id="modalCancelar">VOLTAR</button>
+                <button class="modal-btn confirmar" id="modalConfirmar">CONTINUAR MESMO ASSIM</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalSucesso" class="modal">
+        <div class="modal-content sucesso">
+            <div class="modal-header">
+                <span class="modal-icon">OK</span>
+                <h3>Sucesso!</h3>
+            </div>
+            <div class="modal-body">
+                <p>Inventario enviado com sucesso!</p>
+                <div id="resumoEnvio" class="resumo-envio"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn confirmar" id="fecharSucesso">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
