@@ -1,10 +1,10 @@
-// ============================================
-// CONFIGURAÇÕES
+﻿// ============================================
+// CONFIGURAÃ‡Ã•ES
 // ============================================
 const API_URL = 'https://script.google.com/macros/s/AKfycby1maOcceERkhtNyoBb0_3xHwzV7iupXGkyx-cUeJSKJKVisQ40ui9g1k-wpb2wd7be/exec';
 
 // ============================================
-// DADOS DOS PART NUMBERS (MESMA ORDEM QUE VOCÊ PASSOU)
+// DADOS DOS PART NUMBERS (MESMA ORDEM QUE VOCÃŠ PASSOU)
 // ============================================
 const partNumbers = [
     // 230B
@@ -104,11 +104,13 @@ const partNumbers = [
 ];
 
 // ============================================
-// ESTADO DA APLICAÇÃO
+// ESTADO DA APLICAÃ‡ÃƒO
 // ============================================
 let turnoAtivo = null;
 let modeloAtual = null;
 let pnsFiltrados = [...partNumbers];
+let temaManualAtivo = false;
+let acaoConfirmacaoAtual = null;
 
 // ============================================
 // ELEMENTOS DOM
@@ -122,6 +124,14 @@ const btnVoltar = document.getElementById('btnVoltar');
 const btnEnviar = document.getElementById('btnEnviar');
 const tituloModelo = document.getElementById('tituloModelo');
 const turnoInfo = document.getElementById('turnoInfo');
+const progressoTexto = document.getElementById('progressoTexto');
+const progressoPercentual = document.getElementById('progressoPercentual');
+const progressoBarra = document.getElementById('progressoBarra');
+const btnZerarVazios = document.getElementById('btnZerarVazios');
+const resumoEstoquePalete = document.getElementById('resumoEstoquePalete');
+const resumoEstoqueFrac = document.getElementById('resumoEstoqueFrac');
+const resumoReparoPalete = document.getElementById('resumoReparoPalete');
+const resumoReparoFrac = document.getElementById('resumoReparoFrac');
 const notificacao = document.getElementById('notificacao');
 const modalConfirmacao = document.getElementById('modalConfirmacao');
 const modalSucesso = document.getElementById('modalSucesso');
@@ -134,16 +144,18 @@ const themeToggle = document.getElementById('themeToggle');
 const themeToggleText = document.getElementById('themeToggleText');
 
 const THEME_STORAGE_KEY = 'inventario-theme';
+const THEME_MANUAL_KEY = 'inventario-theme-manual';
 const THEME_LIGHT = 'light';
 const THEME_DARK = 'dark';
 
 // ============================================
-// INICIALIZAÇÃO
+// INICIALIZAÃ‡ÃƒO
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     configurarTema();
     carregarModelos();
     configurarEventos();
+    atualizarPainelPreenchimento();
 });
 
 function configurarEventos() {
@@ -155,16 +167,22 @@ function configurarEventos() {
     // Busca
     buscaPN.addEventListener('input', filtrarModelos);
 
-    // Botões de navegação
+    // BotÃµes de navegaÃ§Ã£o
     btnVoltar.addEventListener('click', voltarParaInicio);
     btnEnviar.addEventListener('click', enviarDados);
+    if (btnZerarVazios) {
+        btnZerarVazios.addEventListener('click', confirmarZerarNaoPreenchidos);
+    }
     if (themeToggle) {
         themeToggle.addEventListener('click', alternarTema);
     }
 
+    cardsContainer.addEventListener('input', lidarComInputCard);
+    cardsContainer.addEventListener('click', lidarComAcoesCard);
+
     // Modais
     modalCancelar.addEventListener('click', fecharModalConfirmacao);
-    modalConfirmar.addEventListener('click', confirmarEnvio);
+    modalConfirmar.addEventListener('click', executarConfirmacaoModal);
     fecharSucesso.addEventListener('click', () => {
         modalSucesso.classList.remove('mostrar');
         voltarParaInicio();
@@ -181,7 +199,7 @@ function configurarEventos() {
 }
 
 // ============================================
-// FUNÇÕES DE TURNO
+// FUNÃ‡Ã•ES DE TURNO
 // ============================================
 function selecionarTurno(turno) {
     turnoAtivo = turno;
@@ -189,10 +207,25 @@ function selecionarTurno(turno) {
         btn.classList.toggle('ativo', btn.dataset.turno === turno);
     });
     turnoInfo.textContent = `${turno}o Turno`;
+
+    if (!temaManualAtivo) {
+        const temaSugerido = turno === '3' ? THEME_DARK : THEME_LIGHT;
+        const temaAtual = document.documentElement.getAttribute('data-theme') || THEME_LIGHT;
+        if (temaAtual !== temaSugerido) {
+            aplicarTema(temaSugerido);
+            mostrarNotificacao(
+                temaSugerido === THEME_DARK
+                    ? 'Tema escuro ativado automaticamente para o 3o turno.'
+                    : 'Tema claro ativado automaticamente para este turno.',
+                'sucesso'
+            );
+        }
+    }
 }
 
 function configurarTema() {
     const temaSalvo = localStorage.getItem(THEME_STORAGE_KEY);
+    temaManualAtivo = localStorage.getItem(THEME_MANUAL_KEY) === 'true';
     const temaInicial = temaSalvo === THEME_DARK ? THEME_DARK : THEME_LIGHT;
     aplicarTema(temaInicial);
 }
@@ -213,11 +246,13 @@ function aplicarTema(tema) {
 function alternarTema() {
     const temaAtual = document.documentElement.getAttribute('data-theme') || THEME_LIGHT;
     const proximoTema = temaAtual === THEME_DARK ? THEME_LIGHT : THEME_DARK;
+    temaManualAtivo = true;
+    localStorage.setItem(THEME_MANUAL_KEY, 'true');
     aplicarTema(proximoTema);
 }
 
 // ============================================
-// FUNÇÕES DOS MODELOS
+// FUNÃ‡Ã•ES DOS MODELOS
 // ============================================
 function carregarModelos() {
     // Agrupar PNs por modelo
@@ -252,7 +287,7 @@ function filtrarModelos() {
         return;
     }
 
-    // Filtrar PNs que contêm o termo
+    // Filtrar PNs que contÃªm o termo
     const pnsFiltrados = partNumbers.filter(item => 
         item.pn.toLowerCase().includes(termo)
     );
@@ -286,7 +321,7 @@ function filtrarModelos() {
 }
 
 // ============================================
-// FUNÇÕES DE PREENCHIMENTO
+// FUNÃ‡Ã•ES DE PREENCHIMENTO
 // ============================================
 function abrirModelo(modelo) {
     if (!turnoAtivo) {
@@ -307,6 +342,8 @@ function abrirModelo(modelo) {
         cardsContainer.appendChild(card);
     });
 
+    atualizarPainelPreenchimento();
+
     // Trocar tela
     telaInicial.classList.remove('ativa');
     telaPreenchimento.classList.add('ativa');
@@ -321,7 +358,12 @@ function criarCardPN(pn) {
     card.dataset.pn = pn;
     
     card.innerHTML = `
+        <div class="card-actions">
+            <span class="card-check" aria-hidden="true">&#10003;</span>
+            <button class="btn-limpar-card" type="button" data-acao="limpar-card" aria-label="Limpar card ${pn}" title="Limpar card">&#128465;</button>
+        </div>
         <div class="pn-titulo">${pn}</div>
+        <div class="card-atualizado" hidden></div>
         <div class="opcoes-container">
             <div class="opcao estoque">
                 <div class="opcao-titulo">ESTOQUE</div>
@@ -359,23 +401,206 @@ function voltarParaInicio() {
     telaPreenchimento.classList.remove('ativa');
     telaInicial.classList.add('ativa');
     modeloAtual = null;
+    atualizarPainelPreenchimento();
 }
 
 // ============================================
-// VALIDAÇÃO E ENVIO
+// VALIDAÃ‡ÃƒO E ENVIO
 // ============================================
+function obterInputsCard(card) {
+    return Array.from(card.querySelectorAll('input[type="number"]'));
+}
+
+function campoTemValor(valor) {
+    return String(valor ?? '').trim() !== '';
+}
+
+function cardTemDados(card) {
+    return obterInputsCard(card).some(input => campoTemValor(input.value));
+}
+
+function cardCompleto(card) {
+    const inputs = obterInputsCard(card);
+    return inputs.length > 0 && inputs.every(input => campoTemValor(input.value));
+}
+
+function formatarHora(isoString) {
+    return new Date(isoString).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function atualizarEstadoCard(card, atualizarHorario = false) {
+    const temDados = cardTemDados(card);
+    const completo = cardCompleto(card);
+    const elementoAtualizado = card.querySelector('.card-atualizado');
+
+    card.classList.toggle('preenchido', temDados);
+    card.classList.toggle('completo', completo);
+
+    if (temDados) {
+        if (atualizarHorario || !card.dataset.ultimaAtualizacao) {
+            card.dataset.ultimaAtualizacao = new Date().toISOString();
+        }
+
+        if (elementoAtualizado) {
+            elementoAtualizado.hidden = false;
+            elementoAtualizado.textContent = `Atualizado: ${formatarHora(card.dataset.ultimaAtualizacao)}`;
+        }
+    } else {
+        delete card.dataset.ultimaAtualizacao;
+        if (elementoAtualizado) {
+            elementoAtualizado.hidden = true;
+            elementoAtualizado.textContent = '';
+        }
+    }
+}
+
+function corProgresso(percentual) {
+    const lightness = 64 - Math.round((percentual / 100) * 22);
+    return `hsl(142, 68%, ${lightness}%)`;
+}
+
+function atualizarPainelPreenchimento() {
+    const cards = Array.from(document.querySelectorAll('.card-pn'));
+    const totalCards = cards.length;
+    let cardsPreenchidos = 0;
+
+    const totais = {
+        estoquePalete: 0,
+        estoqueFrac: 0,
+        reparoPalete: 0,
+        reparoFrac: 0
+    };
+
+    cards.forEach(card => {
+        atualizarEstadoCard(card, false);
+
+        const estoquePalete = card.querySelector('.estoque-palete')?.value || '';
+        const estoqueFrac = card.querySelector('.estoque-frac')?.value || '';
+        const reparoPalete = card.querySelector('.reparo-palete')?.value || '';
+        const reparoFrac = card.querySelector('.reparo-frac')?.value || '';
+
+        if (campoTemValor(estoquePalete) || campoTemValor(estoqueFrac) || campoTemValor(reparoPalete) || campoTemValor(reparoFrac)) {
+            cardsPreenchidos += 1;
+        }
+
+        totais.estoquePalete += parseInt(estoquePalete || 0, 10);
+        totais.estoqueFrac += parseInt(estoqueFrac || 0, 10);
+        totais.reparoPalete += parseInt(reparoPalete || 0, 10);
+        totais.reparoFrac += parseInt(reparoFrac || 0, 10);
+    });
+
+    const percentual = totalCards > 0 ? Math.round((cardsPreenchidos / totalCards) * 100) : 0;
+
+    if (progressoTexto) {
+        progressoTexto.textContent = `${cardsPreenchidos} de ${totalCards} PNs preenchidos`;
+    }
+    if (progressoPercentual) {
+        progressoPercentual.textContent = `${percentual}%`;
+    }
+    if (progressoBarra) {
+        progressoBarra.style.width = `${percentual}%`;
+        progressoBarra.style.backgroundColor = corProgresso(percentual);
+    }
+
+    if (resumoEstoquePalete) resumoEstoquePalete.textContent = String(totais.estoquePalete);
+    if (resumoEstoqueFrac) resumoEstoqueFrac.textContent = String(totais.estoqueFrac);
+    if (resumoReparoPalete) resumoReparoPalete.textContent = String(totais.reparoPalete);
+    if (resumoReparoFrac) resumoReparoFrac.textContent = String(totais.reparoFrac);
+}
+
+function limparDadosCard(card, atualizarHorario = true) {
+    obterInputsCard(card).forEach(input => {
+        input.value = '';
+    });
+    atualizarEstadoCard(card, atualizarHorario);
+}
+
+function confirmarLimpezaCard(card) {
+    abrirModalConfirmacao({
+        mensagem: `Limpar dados deste PN (${card.dataset.pn})?`,
+        textoConfirmar: 'LIMPAR PN',
+        onConfirm: () => {
+            limparDadosCard(card);
+            atualizarPainelPreenchimento();
+            mostrarNotificacao(`PN ${card.dataset.pn} limpo.`, 'sucesso');
+        }
+    });
+}
+
+function lidarComInputCard(evento) {
+    const input = evento.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'number') return;
+
+    const card = input.closest('.card-pn');
+    if (!card) return;
+
+    atualizarEstadoCard(card, true);
+    atualizarPainelPreenchimento();
+}
+
+function lidarComAcoesCard(evento) {
+    const botaoLimpar = evento.target.closest('[data-acao="limpar-card"]');
+    if (!botaoLimpar) return;
+
+    const card = botaoLimpar.closest('.card-pn');
+    if (!card) return;
+
+    confirmarLimpezaCard(card);
+}
+
+function confirmarZerarNaoPreenchidos() {
+    const cards = Array.from(document.querySelectorAll('.card-pn'));
+    if (cards.length === 0) {
+        mostrarNotificacao('Abra um modelo para usar esta acao.', 'erro');
+        return;
+    }
+
+    abrirModalConfirmacao({
+        mensagem: 'Preencher com 0 todos os campos vazios deste modelo?',
+        textoConfirmar: 'ZERAR VAZIOS',
+        onConfirm: zerarCamposNaoPreenchidos
+    });
+}
+
+function zerarCamposNaoPreenchidos() {
+    const cards = Array.from(document.querySelectorAll('.card-pn'));
+    let totalCamposAlterados = 0;
+    let cardsAlterados = 0;
+
+    cards.forEach(card => {
+        let alterouCard = false;
+        obterInputsCard(card).forEach(input => {
+            if (!campoTemValor(input.value)) {
+                input.value = '0';
+                alterouCard = true;
+                totalCamposAlterados += 1;
+            }
+        });
+
+        if (alterouCard) {
+            cardsAlterados += 1;
+            atualizarEstadoCard(card, true);
+        }
+    });
+
+    atualizarPainelPreenchimento();
+
+    if (totalCamposAlterados === 0) {
+        mostrarNotificacao('Nao ha campos vazios para zerar.', 'sucesso');
+        return;
+    }
+
+    mostrarNotificacao(`${cardsAlterados} cards atualizados com zero.`, 'sucesso');
+}
+
 function validarCards() {
     const cards = document.querySelectorAll('.card-pn');
     const cardsVazios = [];
-
     cards.forEach((card, index) => {
-        const estoquePalete = card.querySelector('.estoque-palete').value;
-        const estoqueFrac = card.querySelector('.estoque-frac').value;
-        const reparoPalete = card.querySelector('.reparo-palete').value;
-        const reparoFrac = card.querySelector('.reparo-frac').value;
-
-        // Verifica se TODOS os campos do card estão vazios
-        if (!estoquePalete && !estoqueFrac && !reparoPalete && !reparoFrac) {
+        if (!cardTemDados(card)) {
             cardsVazios.push({
                 card: card,
                 pn: card.dataset.pn,
@@ -383,77 +608,82 @@ function validarCards() {
             });
         }
     });
-
     return cardsVazios;
 }
 
 function enviarDados() {
     if (!turnoAtivo) {
-        mostrarNotificacao('Turno não selecionado!', 'erro');
+        mostrarNotificacao('Turno nao selecionado!', 'erro');
         return;
     }
-
     const cardsVazios = validarCards();
-
     if (cardsVazios.length > 0) {
-        // Mostrar modal com os PNs vazios
         const pnsVazios = cardsVazios.map(item => item.pn).join(', ');
-        modalMensagem.textContent = `Os seguintes itens estão sem informação: ${pnsVazios}. Deseja enviar mesmo assim?`;
-        modalConfirmacao.classList.add('mostrar');
-        
-        // Guardar referência para envio
-        window.cardsVazios = cardsVazios;
+        abrirModalConfirmacao({
+            mensagem: `Os seguintes itens estao sem informacao: ${pnsVazios}. Deseja enviar mesmo assim?`,
+            textoConfirmar: 'CONTINUAR',
+            onConfirm: prepararEnvio
+        });
     } else {
-        // Se não tem vazios, envia direto
         prepararEnvio();
     }
 }
-
 function fecharModalConfirmacao() {
     modalConfirmacao.classList.remove('mostrar');
+    modalConfirmar.textContent = 'CONTINUAR';
+    modalCancelar.textContent = 'VOLTAR';
+    acaoConfirmacaoAtual = null;
 }
-
-function confirmarEnvio() {
-    modalConfirmacao.classList.remove('mostrar');
-    
-    // Se tem cards vazios, podemos prosseguir (usuário confirmou)
-    prepararEnvio();
+function abrirModalConfirmacao({ mensagem, textoConfirmar = 'CONTINUAR', textoCancelar = 'VOLTAR', onConfirm = null }) {
+    modalMensagem.textContent = mensagem;
+    modalConfirmar.textContent = textoConfirmar;
+    modalCancelar.textContent = textoCancelar;
+    acaoConfirmacaoAtual = typeof onConfirm === 'function' ? onConfirm : null;
+    modalConfirmacao.classList.add('mostrar');
 }
-
+function executarConfirmacaoModal() {
+    const acao = acaoConfirmacaoAtual;
+    fecharModalConfirmacao();
+    if (acao) {
+        acao();
+    }
+}
 function prepararEnvio() {
-    // Coletar dados preenchidos
     const cards = document.querySelectorAll('.card-pn');
     const dadosEnvio = [];
-
     cards.forEach(card => {
         const pn = card.dataset.pn;
         const estoquePalete = card.querySelector('.estoque-palete').value;
         const estoqueFrac = card.querySelector('.estoque-frac').value;
         const reparoPalete = card.querySelector('.reparo-palete').value;
         const reparoFrac = card.querySelector('.reparo-frac').value;
-
-        // Só inclui se pelo menos um campo foi preenchido
-        if (estoquePalete || estoqueFrac || reparoPalete || reparoFrac) {
+        if (campoTemValor(estoquePalete) || campoTemValor(estoqueFrac)) {
             dadosEnvio.push({
                 partNumber: pn,
                 turno: turnoAtivo,
-                tipo: estoquePalete || estoqueFrac ? 'estoque' : 'reparo',
-                qtdePalete: parseInt(estoquePalete || reparoPalete || 0),
-                fracionado: parseInt(estoqueFrac || reparoFrac || 0),
+                tipo: 'estoque',
+                qtdePalete: parseInt(estoquePalete || 0, 10),
+                fracionado: parseInt(estoqueFrac || 0, 10),
+                timestamp: new Date().toISOString()
+            });
+        }
+        if (campoTemValor(reparoPalete) || campoTemValor(reparoFrac)) {
+            dadosEnvio.push({
+                partNumber: pn,
+                turno: turnoAtivo,
+                tipo: 'reparo',
+                qtdePalete: parseInt(reparoPalete || 0, 10),
+                fracionado: parseInt(reparoFrac || 0, 10),
                 timestamp: new Date().toISOString()
             });
         }
     });
-
     if (dadosEnvio.length === 0) {
         mostrarNotificacao('Nenhum dado para enviar!', 'erro');
         return;
     }
-
-    // Enviar para API
     enviarParaAPI(dadosEnvio);
 }
-
 async function enviarParaAPI(dados) {
     btnEnviar.disabled = true;
     btnEnviar.innerHTML = '<span class="loading"></span> Enviando...';
@@ -471,9 +701,9 @@ async function enviarParaAPI(dados) {
             }))
         };
 
-        console.log('📦 Enviando lote com', dados.length, 'itens:', dadosLote);
+        console.log('ðŸ“¦ Enviando lote com', dados.length, 'itens:', dadosLote);
 
-        // ÚNICA REQUISIÇÃO com TODOS os itens
+        // ÃšNICA REQUISIÃ‡ÃƒO com TODOS os itens
         const response = await fetch(API_URL, {
             method: 'POST',
             mode: 'no-cors',
@@ -483,19 +713,19 @@ async function enviarParaAPI(dados) {
             body: JSON.stringify(dadosLote) // Envia tudo de uma vez
         });
 
-        // Como é no-cors, não podemos ler response
-        // Mas podemos assumir que deu certo se não deu erro
+        // Como Ã© no-cors, nÃ£o podemos ler response
+        // Mas podemos assumir que deu certo se nÃ£o deu erro
         
-        console.log('✅ Lote enviado com sucesso!');
+        console.log('âœ… Lote enviado com sucesso!');
 
         // Mostrar modal de sucesso
         mostrarModalSucesso(dados);
 
     } catch (error) {
-        console.error('❌ Erro no envio do lote:', error);
+        console.error('âŒ Erro no envio do lote:', error);
         
         // Tenta fallback: enviar um por um se o lote falhar
-        console.log('⚠️ Tentando fallback: envio individual...');
+        console.log('âš ï¸ Tentando fallback: envio individual...');
         
         try {
             for (const item of dados) {
@@ -509,7 +739,7 @@ async function enviarParaAPI(dados) {
                 });
             }
             mostrarModalSucesso(dados);
-            mostrarNotificacao('Envio concluído (modo fallback)', 'sucesso');
+            mostrarNotificacao('Envio concluÃ­do (modo fallback)', 'sucesso');
         } catch (fallbackError) {
             mostrarNotificacao('Erro ao enviar dados. Tente novamente.', 'erro');
         }
@@ -529,26 +759,26 @@ function mostrarModalSucesso(dados) {
     if (estoque.length > 0) {
         resumo += '<strong>ESTOQUE:</strong><br>';
         estoque.forEach(item => {
-            resumo += `• ${item.partNumber}: ${item.qtdePalete} palete, ${item.fracionado} frac<br>`;
+            resumo += `â€¢ ${item.partNumber}: ${item.qtdePalete} palete, ${item.fracionado} frac<br>`;
         });
     }
     
     if (reparo.length > 0) {
         resumo += '<br><strong>REPARO:</strong><br>';
         reparo.forEach(item => {
-            resumo += `• ${item.partNumber}: ${item.qtdePalete} palete, ${item.fracionado} frac<br>`;
+            resumo += `â€¢ ${item.partNumber}: ${item.qtdePalete} palete, ${item.fracionado} frac<br>`;
         });
     }
     
     resumo += `<br><strong>Total:</strong> ${dados.length} itens`;
-    resumo += `<br><strong>Turno:</strong> ${turnoAtivo}º`;
+    resumo += `<br><strong>Turno:</strong> ${turnoAtivo}Âº`;
     
     resumoEnvio.innerHTML = resumo;
     modalSucesso.classList.add('mostrar');
 }
 
 // ============================================
-// UTILITÁRIOS
+// UTILITÃRIOS
 // ============================================
 function mostrarNotificacao(mensagem, tipo) {
     notificacao.textContent = mensagem;
@@ -559,7 +789,7 @@ function mostrarNotificacao(mensagem, tipo) {
     }, 3000);
 }
 
-// Scroll para card específico
+// Scroll para card especÃ­fico
 function scrollAteCard(card) {
     const headerOffset = 100;
     const elementPosition = card.getBoundingClientRect().top;
@@ -576,3 +806,4 @@ function scrollAteCard(card) {
         card.classList.remove('alerta');
     }, 2000);
 }
+

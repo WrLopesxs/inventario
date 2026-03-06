@@ -52,11 +52,42 @@
                     <span class="turno-info" id="turnoInfo"></span>
                 </div>
 
+                <div class="progresso-modelo">
+                    <div class="progresso-topo">
+                        <strong id="progressoTexto">0 de 0 PNs preenchidos</strong>
+                        <span id="progressoPercentual">0%</span>
+                    </div>
+                    <div class="progresso-trilho">
+                        <div class="progresso-barra" id="progressoBarra"></div>
+                    </div>
+                </div>
+
                 <div class="cards-container" id="cardsContainer">
                     <!-- Cards serao inseridos via JS -->
                 </div>
 
                 <div class="footer-envio">
+                    <div class="footer-acoes">
+                        <button class="btn-zerar" id="btnZerarVazios" type="button">Zerar nao preenchidos</button>
+                    </div>
+                    <div class="resumo-dinamico">
+                        <div class="resumo-card">
+                            <span>Estoque Palete</span>
+                            <strong id="resumoEstoquePalete">0</strong>
+                        </div>
+                        <div class="resumo-card">
+                            <span>Estoque Fracionado</span>
+                            <strong id="resumoEstoqueFrac">0</strong>
+                        </div>
+                        <div class="resumo-card">
+                            <span>Reparo Palete</span>
+                            <strong id="resumoReparoPalete">0</strong>
+                        </div>
+                        <div class="resumo-card">
+                            <span>Reparo Fracionado</span>
+                            <strong id="resumoReparoFrac">0</strong>
+                        </div>
+                    </div>
                     <button class="btn-enviar" id="btnEnviar">
                         <span class="btn-enviar-icon" aria-hidden="true">-></span>
                         ENVIAR INVENTARIO
